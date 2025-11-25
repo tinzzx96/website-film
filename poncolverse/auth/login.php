@@ -1,0 +1,63 @@
+<?php
+require_once '../config/config.php';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $email = clean_input($_POST['email']);
+    $password = $_POST['password'];
+    
+    // Validasi input
+    if (empty($email) || empty($password)) {
+        echo json_encode(['success' => false, 'message' => 'Email dan password harus diisi']);
+        exit;
+    }
+    
+    // Cek user di database
+    $sql = "SELECT * FROM users WHERE email = ?";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("s", $email);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows === 0) {
+        echo json_encode(['success' => false, 'message' => 'Email tidak terdaftar']);
+        exit;
+    }
+    
+    $user = $result->fetch_assoc();
+    
+    // Verifikasi password
+    if (!password_verify($password, $user['password'])) {
+        // Fallback untuk password lama yang masih pakai MD5
+        if (md5($password) !== $user['password']) {
+            echo json_encode(['success' => false, 'message' => 'Password salah']);
+            exit;
+        }
+    }
+    
+    // Set session
+    $_SESSION['user_id'] = $user['id'];
+    $_SESSION['user_email'] = $user['email'];
+    $_SESSION['user_name'] = $user['firstName'] . ' ' . $user['lastName'];
+    $_SESSION['user_role'] = $user['role'];
+    $_SESSION['user_firstName'] = $user['firstName'];
+    $_SESSION['user_lastName'] = $user['lastName'];
+    $_SESSION['user_status'] = $user['status'];
+    $_SESSION['user_joinDate'] = date('d/m/Y', strtotime($user['joinDate']));
+    
+    echo json_encode([
+        'success' => true, 
+        'message' => 'Login berhasil',
+        'user' => [
+            'id' => $user['id'],
+            'firstName' => $user['firstName'],
+            'lastName' => $user['lastName'],
+            'email' => $user['email'],
+            'role' => $user['role'],
+            'status' => $user['status'],
+            'joinDate' => date('d/m/Y', strtotime($user['joinDate']))
+        ]
+    ]);
+} else {
+    echo json_encode(['success' => false, 'message' => 'Invalid request method']);
+}
+?>
